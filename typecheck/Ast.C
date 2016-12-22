@@ -443,7 +443,10 @@ string OpNode::codeGen(RegManager *rm) {
 	RelOpIns *roi = NULL;
 	FloatArithIns *fai = NULL;
 	FloatRelOpIns *froi = NULL;
+	MovIns *mvi, *mvi1, *mvi2;  // all instructions for SHR, SHL
 	OpNode::OpCode opcode = this->opCode();
+	
+	int tmpReg3, tmpReg4; // specifically for SHR, SHL
 
 	// inherit existing code
 	arity = this->arity();
@@ -587,12 +590,101 @@ string OpNode::codeGen(RegManager *rm) {
 			case OpNode::OpCode::BITNOT:
 				// TODO
 				// BITNOT can be implementated using XOR arg1 1111
+				// arg2 overriden here since it is a constant
+				arg2 = new Instruction::Operand(Instruction::Operand::OperandType::INT_CONST, -1);
+				ai = new ArithIns(ArithIns::ArithInsType::XOR, arg1, arg2, dest);
+				useDestReg = true;
+				break;
+				
 			case OpNode::OpCode::SHL:
 				// TODO
 				// SHL can be implementated using repeat 'MUL arg1 2' arg2 times
+				// step 1: store the 1st arg in a temp register
+				tmpReg3 = op1->getTmpReg();
+				Instruction::Operand* dest_ = new Instruction::Operand(Instruction::Operand::OperandType::INT_REG, tmpReg3);
+				mvi = new MovIns(MovIns::MovInsType::MOVI, arg1, dest_);
+				
+				// step 2: store the 2nd arg also to a temp register
+				tmpReg4 = op2->getTmpReg();
+				dest1 = new Instruction::Operand(Instruction::Operand::OperandType::INT_REG, tmpReg4);
+				mvi1 = new MovIns(MovIns::MovInsType::MOVI, arg2, dest1);
+				
+				// add label
+				std::string newLabel = Instruction::getLabel();
+				arg_jump = new Instruction::Operand(Instruction::Operand::STR_CONST, newLabel);
+            				
+				// step 3 : check if 2nd arg became/is 0
+				
+				Instruction::Operand arg = new Instruction::Operand(Instruction::Operand::OperandType::INT_CONST,0);
+				
+				// construct an Instruction RELOP that compares arg2 with 0.
+				RelOpIns* relop = new RelOpIns(RelOpIns::RelOpInsType::EQ, dest1, arg);
+				JumpIns* jmpi = new JumpIns(JumpIns::JumpInsType::JMPC, relop, arg_jump);
+				
+				// step 4: multiply arg1 with 2
+				arg2 = new Instruction::Operand(Instruction::Operand::OperandType::INT_CONST, 2);
+				dest2 = new Instruction::Operand(Instruction::Operand::OperandType::INT_REG, tmpReg5); // another temp register
+				a1 = new ArithIns(ArithIns::ArithInsType::MUL, dest_, arg2, dest2);
+				
+				// step 5: decrement arg2 by 1
+				
+				Instruction::Operand arg_sub = new Instruction::Operand(Instruction::Operand::INT_CONST,1);
+				ArithIns* dec1 = new ArithIns(ArithIns::ArithInsType::SUB, dest1, arg_sub, dest1);
+				
+				// step 6: jump to beginning of SHL 
+				
+				JumpIns* jmp = new JumpIns(JumpIns::JumpInsType::JMP, newLabel);
+				
+				// step 7: move final result into destination
+				
+				
+				MovIns* movFinalIns = new MovIns(MovIns::MovInsType::MOVI, dest2, dest ); 
+				
+				
+				
 			case OpNode::OpCode::SHR:
 				// TODO
 				// SHR can be implementated using repeat 'DIV arg1 2' arg2 times
+				
+				tmpReg3 = op1->getTmpReg();
+				Instruction::Operand* dest_ = new Instruction::Operand(Instruction::Operand::OperandType::INT_REG, tmpReg3);
+				mvi = new MovIns(MovIns::MovInsType::MOVI, arg1, dest_);
+				
+				// step 2: store the 2nd arg also to a temp register
+				tmpReg4 = op2->getTmpReg();
+				dest1 = new Instruction::Operand(Instruction::Operand::OperandType::INT_REG, tmpReg4);
+				mvi1 = new MovIns(MovIns::MovInsType::MOVI, arg2, dest1);
+				
+				// add label
+				std::string newLabel = Instruction::getLabel();
+				arg_jump = new Instruction::Operand(Instruction::Operand::STR_CONST, newLabel);
+            				
+				// step 3 : check if 2nd arg became/is 0
+				
+				Instruction::Operand arg = new Instruction::Operand(Instruction::Operand::OperandType::INT_CONST,0);
+				
+				// construct an Instruction RELOP that compares arg2 with 0.
+				RelOpIns* relop = new RelOpIns(RelOpIns::RelOpInsType::EQ, dest1, arg);
+				JumpIns* jmpi = new JumpIns(JumpIns::JumpInsType::JMPC, relop, arg_jump);
+				
+				// step 4: multiply arg1 with 2
+				arg2 = new Instruction::Operand(Instruction::Operand::OperandType::INT_CONST, 2);
+				dest2 = new Instruction::Operand(Instruction::Operand::OperandType::INT_REG, tmpReg5); // another temp register
+				a1 = new ArithIns(ArithIns::ArithInsType::DIV, dest_, arg2, dest2);
+				
+				// step 5: decrement arg2 by 1
+				
+				Instruction::Operand arg_sub = new Instruction::Operand(Instruction::Operand::INT_CONST,1);
+				ArithIns* dec1 = new ArithIns(ArithIns::ArithInsType::SUB, dest1, arg_sub, dest1);
+				
+				// step 6: jump to beginning of SHL 
+				
+				JumpIns* jmp = new JumpIns(JumpIns::JumpInsType::JMP, arg_jump);
+				
+				// step 7: move final result into destination
+				
+				
+				MovIns* movFinalIns = new MovIns(MovIns::MovInsType::MOVI, dest2, dest ); 
 			case OpNode::OpCode::PRINT:
 				// TODO
 				// PRINT is not supported from lex parser ast type check to now
